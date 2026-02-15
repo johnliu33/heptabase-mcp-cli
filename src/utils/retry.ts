@@ -45,7 +45,12 @@ export async function withRetry<T>(
         throw error;
       }
 
-      const delay = baseDelay * Math.pow(2, attempt);
+      // 指數退避 + 隨機 jitter（避免 thundering herd）
+      const jitter = 0.5 + Math.random() * 0.5; // 0.5 ~ 1.0
+      const delay = baseDelay * Math.pow(2, attempt) * jitter;
+      console.debug(
+        `[DEBUG] retry attempt ${attempt + 1}/${maxRetries}, delay=${Math.round(delay)}ms`,
+      );
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }

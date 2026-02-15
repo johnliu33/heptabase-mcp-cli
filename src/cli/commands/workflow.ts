@@ -2,7 +2,13 @@ import { Command } from 'commander';
 import { TokenManager } from '../../transport/token-manager.js';
 import { createMcpClient } from '../../transport/mcp-client.js';
 import { HeptabaseClient } from '../../client/index.js';
-import { whiteboardDeepDive, pdfResearch, knowledgeReview } from '../../workflows/index.js';
+import {
+  whiteboardDeepDive,
+  pdfResearch,
+  knowledgeReview,
+  topicAnalysis,
+  orphanDetection,
+} from '../../workflows/index.js';
 
 export function createWorkflowCommand(): Command {
   const workflow = new Command('workflow')
@@ -123,6 +129,74 @@ export function createWorkflowCommand(): Command {
           for (const note of result.related_notes) {
             console.log(`\n── ${note.title} (${note.type}) ──`);
             console.log(note.content);
+          }
+        }
+      } catch (error) {
+        console.error('Workflow 失敗：', error instanceof Error ? error.message : error);
+        process.exit(1);
+      }
+    });
+
+  // ── topic-analysis ──
+  workflow
+    .command('topic-analysis')
+    .alias('ta')
+    .description('主題分析：語意搜尋相關筆記並取得全文')
+    .argument('<topic>', '分析主題')
+    .option('--max-notes <n>', '最多取得筆記數量', '10')
+    .option('--json', '以 JSON 格式輸出', false)
+    .action(async (topic: string, options: { maxNotes: string; json: boolean }) => {
+      try {
+        const tokenManager = new TokenManager();
+        const mcp = createMcpClient(tokenManager);
+        const client = new HeptabaseClient(mcp);
+
+        const result = await topicAnalysis(client, {
+          topic,
+          max_notes: parseInt(options.maxNotes, 10),
+        });
+
+        if (options.json) {
+          console.log(JSON.stringify(result, null, 2));
+        } else {
+          console.log(`主題：${result.topic}`);
+          console.log(`相關筆記：${result.total_notes}`);
+          for (const note of result.notes) {
+            console.log(`\n── ${note.title} (${note.type}) ──`);
+            console.log(note.content);
+          }
+        }
+      } catch (error) {
+        console.error('Workflow 失敗：', error instanceof Error ? error.message : error);
+        process.exit(1);
+      }
+    });
+
+  // ── orphan-detection ──
+  workflow
+    .command('orphan-detection')
+    .alias('od')
+    .description('孤立筆記偵測：找出不在任何白板上的筆記')
+    .option('--query <q>', '搜尋範圍關鍵字')
+    .option('--json', '以 JSON 格式輸出', false)
+    .action(async (options: { query?: string; json: boolean }) => {
+      try {
+        const tokenManager = new TokenManager();
+        const mcp = createMcpClient(tokenManager);
+        const client = new HeptabaseClient(mcp);
+
+        const result = await orphanDetection(client, {
+          query: options.query,
+        });
+
+        if (options.json) {
+          console.log(JSON.stringify(result, null, 2));
+        } else {
+          console.log(`白板數量：${result.total_whiteboards}`);
+          console.log(`白板物件數：${result.total_whiteboard_objects}`);
+          console.log(`孤立候選：${result.orphan_candidates.length}`);
+          for (const orphan of result.orphan_candidates) {
+            console.log(`  - ${orphan.title} (${orphan.type}) [${orphan.id}]`);
           }
         }
       } catch (error) {

@@ -5,7 +5,13 @@ import { createMcpClient } from '../../transport/mcp-client.js';
 import { HeptabaseClient } from '../../client/index.js';
 import { formatResult } from '../format.js';
 import type { ObjectType } from '../../types/official-tools.js';
-import { whiteboardDeepDive, pdfResearch, knowledgeReview } from '../../workflows/index.js';
+import {
+  whiteboardDeepDive,
+  pdfResearch,
+  knowledgeReview,
+  topicAnalysis,
+  orphanDetection,
+} from '../../workflows/index.js';
 
 // ── ANSI helpers ──────────────────────────────────────────────
 
@@ -72,6 +78,8 @@ function printHelp(): void {
     `${c.yellow('/deep-dive')} ${c.dim('<query|id>')}   白板深入探索`,
     `${c.yellow('/pdf-research')} ${c.dim('<topic> [id]')} PDF 研究`,
     `${c.yellow('/review')} ${c.dim('<start> <end> [topic]')} 知識回顧`,
+    `${c.yellow('/topic')} ${c.dim('<topic> [max]')}    主題分析`,
+    `${c.yellow('/orphans')} ${c.dim('[query]')}         孤立筆記偵測`,
     '',
     `${c.yellow('/clear')}                     清除畫面`,
     `${c.yellow('/exit')}                      退出`,
@@ -246,6 +254,27 @@ async function exec(client: HeptabaseClient, line: string): Promise<boolean> {
       }
       await runWorkflow('知識回顧中…', () =>
         knowledgeReview(client, { start_date: startDate, end_date: endDate, topic }),
+      );
+      return true;
+    }
+
+    case 'topic': {
+      const topicStr = args[0];
+      const maxNotes = args[1] ? parseInt(args[1], 10) : undefined;
+      if (!topicStr) {
+        console.log(c.red('用法：/topic <topic> [max_notes]'));
+        return true;
+      }
+      await runWorkflow('主題分析中…', () =>
+        topicAnalysis(client, { topic: topicStr, max_notes: maxNotes }),
+      );
+      return true;
+    }
+
+    case 'orphans': {
+      const orphanQuery = args.join(' ') || undefined;
+      await runWorkflow('孤立筆記偵測中…', () =>
+        orphanDetection(client, { query: orphanQuery }),
       );
       return true;
     }

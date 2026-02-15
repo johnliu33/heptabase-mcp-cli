@@ -52,51 +52,51 @@ export async function whiteboardDeepDive(
     : await client.getWhiteboard(whiteboardId);
   const parsedObjects = parseWhiteboardObjects(wbResult);
 
-  // 3. 逐一取得物件內容
-  const objects: WhiteboardObject[] = [];
+  // 3. 並行取得物件內容
   const incompleteObjects: string[] = [];
 
-  for (const obj of parsedObjects) {
-    try {
+  const results = await Promise.allSettled(
+    parsedObjects.map(async (obj) => {
       if (isPdfType(obj.type)) {
         // PDF 類型：使用 search_pdf_content，不呼叫 get_object (WT-02)
         const query = input.query ?? obj.title;
         const pdfResult = await client.searchPdfContent(obj.id, [query]);
         const content = extractText(pdfResult);
-        objects.push({
-          id: obj.id,
-          type: obj.type,
-          title: obj.title,
-          content,
-          content_status: 'ok',
-        });
+        return { obj, content, incomplete: false };
       } else {
         // 其他類型：使用 get_object
         const objResult = await client.getObject(obj.id, obj.type as ObjectType);
         const content = extractText(objResult);
         const incomplete = hasMoreContent(objResult);
-        objects.push({
-          id: obj.id,
-          type: obj.type,
-          title: obj.title,
-          content,
-          content_status: 'ok',
-        });
-        if (incomplete) {
-          incompleteObjects.push(obj.id);
-        }
+        return { obj, content, incomplete };
       }
-    } catch {
-      // 容錯：個別物件失敗不中斷
-      objects.push({
-        id: obj.id,
-        type: obj.type,
-        title: obj.title,
-        content: '',
-        content_status: 'skipped',
-      });
+    }),
+  );
+
+  const objects: WhiteboardObject[] = results.map((r, i) => {
+    if (r.status === 'fulfilled') {
+      if (r.value.incomplete) {
+        incompleteObjects.push(r.value.obj.id);
+      }
+      return {
+        id: r.value.obj.id,
+        type: r.value.obj.type,
+        title: r.value.obj.title,
+        content: r.value.content,
+        content_status: 'ok' as const,
+      };
     }
-  }
+    // 容錯：個別物件失敗不中斷
+    const obj = parsedObjects[i];
+    client.logger.warn(`whiteboard-deep-dive: 取得物件 ${obj.id} 失敗 — ${r.reason}`);
+    return {
+      id: obj.id,
+      type: obj.type,
+      title: obj.title,
+      content: '',
+      content_status: 'skipped' as const,
+    };
+  });
 
   return {
     whiteboard_name: whiteboardName,

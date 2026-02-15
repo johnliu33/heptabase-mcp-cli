@@ -20,24 +20,30 @@ export async function knowledgeReview(
   const journalMatches = journalContent.match(/<journal\b/g);
   const journalCount = journalMatches ? journalMatches.length : (journalContent ? 1 : 0);
 
-  // 2. 有 topic 時搜尋相關筆記
+  // 2. 有 topic 時搜尋相關筆記（並行取得）
   const relatedNotes: RelatedNote[] = [];
   if (input.topic) {
     const searchResult = await client.semanticSearch([input.topic]);
     const objects = parseSearchObjects(searchResult);
 
-    for (const obj of objects) {
-      try {
+    const results = await Promise.allSettled(
+      objects.map(async (obj) => {
         const objResult = await client.getObject(obj.id, obj.type as ObjectType);
         const content = extractText(objResult);
-        relatedNotes.push({
+        return {
           id: obj.id,
           type: obj.type as ObjectType,
           title: obj.title,
           content,
-        });
-      } catch {
-        // 個別物件失敗不中斷
+        } satisfies RelatedNote;
+      }),
+    );
+
+    for (const r of results) {
+      if (r.status === 'fulfilled') {
+        relatedNotes.push(r.value);
+      } else {
+        client.logger.warn(`knowledge-review: 取得相關筆記失敗 — ${r.reason}`);
       }
     }
   }

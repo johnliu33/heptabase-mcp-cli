@@ -58,3 +58,34 @@ export interface KnowledgeReviewOutput {
   journal_content: string;
   related_notes: RelatedNote[];
 }
+
+// ─── Topic Analysis ───
+
+export interface TopicAnalysisInput {
+  topic: string;
+  max_notes?: number;
+}
+
+export interface TopicAnalysisOutput {
+  topic: string;
+  total_notes: number;
+  notes: RelatedNote[];
+}
+
+// ─── Orphan Detection ───
+
+export interface OrphanDetectionInput {
+  query?: string;
+}
+
+export interface OrphanObject {
+  id: string;
+  title: string;
+  type: string;
+}
+
+export interface OrphanDetectionOutput {
+  total_whiteboards: number;
+  total_whiteboard_objects: number;
+  orphan_candidates: OrphanObject[];
+}

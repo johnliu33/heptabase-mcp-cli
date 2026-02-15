@@ -61,15 +61,16 @@ export async function pdfResearch(
   const relevantPages = parseChunkPageNumbers(chunkResult);
   const sourceChunksCount = countChunks(chunkResult);
 
-  // 3. 取得頁面全文
+  // 3. 並行取得頁面全文（用 index 保持順序）
   let pageContents = '';
   if (relevantPages.length > 0) {
     const ranges = mergePageRanges(relevantPages);
-    const parts: string[] = [];
-    for (const [start, end] of ranges) {
-      const pageResult = await client.getPdfPages(pdfId, start, end);
-      parts.push(extractText(pageResult));
-    }
+    const parts = await Promise.all(
+      ranges.map(async ([start, end]) => {
+        const pageResult = await client.getPdfPages(pdfId, start, end);
+        return extractText(pageResult);
+      }),
+    );
     pageContents = parts.join('\n\n');
   }
 

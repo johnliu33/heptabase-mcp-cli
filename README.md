@@ -10,6 +10,7 @@ CLI tool for searching and reading your [Heptabase](https://heptabase.com) knowl
 - **Object deep read** — Retrieve full content of any card, journal, or media
 - **Interactive mode** — Menu-driven exploration with drill-down
 - **In-memory cache** — Avoids redundant API calls (60s for search, 300s for reads)
+- **Workflows** — Multi-step automated workflows (whiteboard deep-dive, PDF research, knowledge review, topic analysis, orphan detection)
 
 ## Prerequisites
 
@@ -98,6 +99,27 @@ heptabase i
 
 Menu-driven mode: search notes, browse whiteboards, drill into objects.
 
+### `workflow` — Multi-step Workflows
+
+```bash
+# Whiteboard deep dive: search + fetch all objects
+heptabase workflow whiteboard-deep-dive --query "project"
+heptabase workflow wdd --id <whiteboard-id> --json
+
+# PDF research: find PDF + extract relevant pages
+heptabase workflow pdf-research "machine learning"
+heptabase workflow pr "topic" --pdf-id <id>
+
+# Knowledge review: journals + related notes
+heptabase workflow knowledge-review 2025-01-01 2025-01-31 --topic "AI"
+
+# Topic analysis: semantic search + full content
+heptabase workflow topic-analysis "deep learning" --max-notes 5
+
+# Orphan detection: find notes not on any whiteboard
+heptabase workflow orphan-detection --query "project"
+```
+
 ### Global Options
 
 ```bash
@@ -123,6 +145,7 @@ This project is a **client layer** wrapping the official Heptabase MCP — it do
 pnpm dev           # Run with tsx
 pnpm build         # Build with tsup
 pnpm test          # Run tests (vitest)
+pnpm test:e2e      # Run E2E tests
 pnpm lint          # Type check (tsc --noEmit)
 ```
 
@@ -136,10 +159,13 @@ src/
 ├── cli/commands/            # CLI subcommands
 ├── cache/                   # In-memory TTL cache
 ├── types/                   # TypeScript type definitions
-└── utils/                   # Logger, retry with backoff
+├── workflows/               # Multi-step workflow orchestrations
+└── utils/                   # Logger, retry with backoff + jitter
 
 tests/
-├── contract/                # Contract tests (CT-01 ~ CT-05)
+├── contract/                # Contract tests (CT-01 ~ CT-12)
+├── workflow/                # Workflow tests (WT-01 ~ WT-06)
+├── e2e/                     # E2E integration tests (E2E-01 ~ E2E-02)
 └── unit/                    # Unit tests (cache, retry)
 ```
 
@@ -149,10 +175,10 @@ OAuth tokens are stored at `~/.heptabase-extension/token.json` with `0600` permi
 
 ## Roadmap
 
-- **Phase 1 (current)**: Search + read (4 tools) + OAuth + cache + CLI
+- **Phase 1**: Search + read (4 tools) + OAuth + cache + CLI
 - **Phase 2**: Journal, write operations, PDF tools
 - **Phase 3**: High-level workflows (whiteboard deep-dive, PDF research, knowledge review)
-- **Phase 4**: E2E tests, performance optimization
+- **Phase 4 (current)**: E2E tests, performance optimization, topic analysis, orphan detection
 
 ## License
 
