@@ -39,9 +39,13 @@ export function createInteractiveCommand(): Command {
           choices: [
             { value: 'search', name: '搜尋筆記' },
             { value: 'journal', name: '讀取日誌（依日期）' },
+            { value: 'journal-append', name: '追加到今天的日誌' },
+            { value: 'save', name: '建立新卡片' },
             { value: 'whiteboard-search', name: '搜尋白板' },
             { value: 'whiteboard-get', name: '讀取白板（需要 ID）' },
             { value: 'object-get', name: '讀取物件（需要 ID）' },
+            { value: 'pdf-search', name: '搜尋 PDF 內容' },
+            { value: 'pdf-pages', name: '取得 PDF 頁面' },
             { value: 'exit', name: '退出' },
           ],
         });
@@ -126,6 +130,65 @@ export function createInteractiveCommand(): Command {
               console.log(formatResult(result, false));
             } catch (error) {
               console.error('讀取失敗：', error instanceof Error ? error.message : error);
+            }
+            break;
+          }
+
+          case 'journal-append': {
+            const content = await input({ message: '要追加的內容（Markdown）：' });
+            if (!content) break;
+            try {
+              const result = await client.appendToJournal(content);
+              console.log(formatResult(result, false));
+            } catch (error) {
+              console.error('追加日誌失敗：', error instanceof Error ? error.message : error);
+            }
+            break;
+          }
+
+          case 'save': {
+            const content = await input({ message: 'Markdown 內容（第一個 h1 為標題）：' });
+            if (!content) break;
+            try {
+              const result = await client.saveToNoteCard(content);
+              console.log(formatResult(result, false));
+            } catch (error) {
+              console.error('建立卡片失敗：', error instanceof Error ? error.message : error);
+            }
+            break;
+          }
+
+          case 'pdf-search': {
+            const pdfId = await input({ message: 'PDF 卡片 ID：' });
+            if (!pdfId) break;
+            const keywordsStr = await input({ message: '搜尋關鍵字（逗號分隔，1-5 個）：' });
+            if (!keywordsStr) break;
+            const keywords = keywordsStr.split(',').map(k => k.trim()).filter(Boolean);
+            try {
+              const result = await client.searchPdfContent(pdfId, keywords);
+              console.log(formatResult(result, false));
+            } catch (error) {
+              console.error('搜尋 PDF 失敗：', error instanceof Error ? error.message : error);
+            }
+            break;
+          }
+
+          case 'pdf-pages': {
+            const pdfId = await input({ message: 'PDF 卡片 ID：' });
+            if (!pdfId) break;
+            const startStr = await input({ message: '起始頁碼（≥ 1）：' });
+            const endStr = await input({ message: '結束頁碼：' });
+            const startPage = parseInt(startStr, 10);
+            const endPage = parseInt(endStr, 10);
+            if (isNaN(startPage) || isNaN(endPage)) {
+              console.error('頁碼必須是數字');
+              break;
+            }
+            try {
+              const result = await client.getPdfPages(pdfId, startPage, endPage);
+              console.log(formatResult(result, false));
+            } catch (error) {
+              console.error('取得 PDF 頁面失敗：', error instanceof Error ? error.message : error);
             }
             break;
           }

@@ -140,3 +140,81 @@ describe('get_object', () => {
     expect(mockMcp.callLog).toHaveLength(1);
   });
 });
+
+describe('get_journal_range 自動分割', () => {
+  let mockMcp: MockMcpClient;
+  let client: HeptabaseClient;
+  let testLogger: Logger;
+
+  beforeEach(() => {
+    mockMcp = createMockMcpClient();
+    testLogger = new Logger('debug');
+    client = new HeptabaseClient(mockMcp as unknown as McpClient, new MemoryCache(), testLogger);
+  });
+
+  it('CT-06: >90 天應自動分割為多次 MCP 呼叫', async () => {
+    mockMcp.onTool('get_journal_range', (args) => ({
+      content: [
+        {
+          type: 'text',
+          text: `<journal range="${args.startDate}~${args.endDate}">日誌內容</journal>`,
+        },
+      ],
+    }));
+
+    // 2024-01-01 ~ 2024-06-30 = 181 天
+    const result = await client.getJournalRange('2024-01-01', '2024-06-30');
+
+    // 應有多次 MCP 呼叫
+    expect(mockMcp.callLog.length).toBeGreaterThan(1);
+
+    // 每段 ≤90 天
+    for (const call of mockMcp.callLog) {
+      const start = new Date(call.args.startDate as string);
+      const end = new Date(call.args.endDate as string);
+      const days = Math.round((end.getTime() - start.getTime()) / 86400000);
+      expect(days).toBeLessThanOrEqual(90);
+    }
+
+    // 合併後的結果應包含所有內容
+    expect(result.content[0].text).toContain('日誌內容');
+  });
+
+  it('CT-06 supplement: 分割後的呼叫應涵蓋完整範圍', async () => {
+    mockMcp.onTool('get_journal_range', (args) => ({
+      content: [{ type: 'text', text: `${args.startDate}~${args.endDate}` }],
+    }));
+
+    await client.getJournalRange('2024-01-01', '2024-12-31');
+
+    // 第一段起始日 = 原始起始日
+    expect(mockMcp.callLog[0].args.startDate).toBe('2024-01-01');
+    // 最後一段結束日 = 原始結束日
+    expect(mockMcp.callLog[mockMcp.callLog.length - 1].args.endDate).toBe('2024-12-31');
+  });
+
+  it('CT-07: ≤90 天應只有單次呼叫', async () => {
+    mockMcp.onTool('get_journal_range', () => ({
+      content: [{ type: 'text', text: '<journal>短期日誌</journal>' }],
+    }));
+
+    await client.getJournalRange('2024-01-01', '2024-03-01'); // 60 天
+
+    expect(mockMcp.callLog).toHaveLength(1);
+    expect(mockMcp.callLog[0].args).toEqual({
+      startDate: '2024-01-01',
+      endDate: '2024-03-01',
+    });
+  });
+
+  it('CT-07 supplement: ≤90 天結果應被快取', async () => {
+    mockMcp.onTool('get_journal_range', () => ({
+      content: [{ type: 'text', text: '<journal>快取測試</journal>' }],
+    }));
+
+    await client.getJournalRange('2024-01-01', '2024-02-01');
+    await client.getJournalRange('2024-01-01', '2024-02-01');
+
+    expect(mockMcp.callLog).toHaveLength(1);
+  });
+});

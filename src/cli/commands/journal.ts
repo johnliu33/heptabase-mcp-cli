@@ -3,8 +3,7 @@ import { TokenManager } from '../../transport/token-manager.js';
 import { createMcpClient } from '../../transport/mcp-client.js';
 import { HeptabaseClient } from '../../client/index.js';
 import { formatResult } from '../format.js';
-
-const MAX_DAYS = 92;
+import { diffDays } from '../../utils/date-range.js';
 
 function parseDate(value: string): string {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
@@ -23,18 +22,13 @@ function daysAgoStr(days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-function diffDays(a: string, b: string): number {
-  const msPerDay = 86400000;
-  return Math.round((new Date(b).getTime() - new Date(a).getTime()) / msPerDay);
-}
-
 export function createJournalCommand(): Command {
   const journal = new Command('journal')
-    .description('讀取日誌');
+    .description('讀取與追加日誌');
 
   journal
     .command('get')
-    .description('依日期範圍讀取日誌（最多 92 天）')
+    .description('依日期範圍讀取日誌（超過 90 天將自動分割查詢）')
     .option('--from <date>', '起始日期 YYYY-MM-DD（預設：7 天前）')
     .option('--to <date>', '結束日期 YYYY-MM-DD（預設：今天）')
     .option('--json', '以 JSON 格式輸出', false)
@@ -48,9 +42,9 @@ export function createJournalCommand(): Command {
           console.error(`起始日期 (${startDate}) 不能晚於結束日期 (${endDate})`);
           process.exit(1);
         }
-        if (days > MAX_DAYS) {
-          console.error(`日期範圍超過 ${MAX_DAYS} 天（目前 ${days} 天）。請縮小範圍或分次查詢。`);
-          process.exit(1);
+
+        if (days > 90) {
+          console.log(`日期範圍 ${days} 天，將自動分割為多段查詢`);
         }
 
         console.log(`查詢日誌：${startDate} ~ ${endDate}（${days + 1} 天）`);
@@ -84,6 +78,27 @@ export function createJournalCommand(): Command {
         console.log(formatResult(result, options.json));
       } catch (error) {
         console.error('讀取日誌失敗：', error instanceof Error ? error.message : error);
+        process.exit(1);
+      }
+    });
+
+  journal
+    .command('append')
+    .description('追加內容到今天的日誌')
+    .argument('<content>', '要追加的 Markdown 內容')
+    .option('--json', '以 JSON 格式輸出', false)
+    .action(async (content: string, options: { json: boolean }) => {
+      try {
+        console.log('追加內容到今天的日誌...');
+
+        const tokenManager = new TokenManager();
+        const mcp = createMcpClient(tokenManager);
+        const client = new HeptabaseClient(mcp);
+
+        const result = await client.appendToJournal(content);
+        console.log(formatResult(result, options.json));
+      } catch (error) {
+        console.error('追加日誌失敗：', error instanceof Error ? error.message : error);
         process.exit(1);
       }
     });

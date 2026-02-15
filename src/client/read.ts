@@ -2,6 +2,8 @@ import type { McpClient } from '../transport/mcp-client.js';
 import type { MemoryCache } from '../cache/memory-cache.js';
 import type { Logger } from '../utils/logger.js';
 import type { McpToolResult, ObjectType } from '../types/official-tools.js';
+import { splitDateRange, diffDays } from '../utils/date-range.js';
+import { extractText } from '../utils/mcp-result.js';
 
 export class ReadClient {
   constructor(
@@ -39,7 +41,7 @@ export class ReadClient {
     const parsed = result as McpToolResult;
 
     // 檢查回傳文字中是否含有 hasMore 標記
-    const text = this.extractText(parsed);
+    const text = extractText(parsed);
     if (text.includes('hasMore')) {
       this.logger.warn(`物件 ${objectId} 內容不完整，hasMore=true`);
 
@@ -62,18 +64,33 @@ export class ReadClient {
       return cached;
     }
 
-    const result = await this.mcp.callTool('get_journal_range', { startDate, endDate });
-    const parsed = result as McpToolResult;
+    const days = diffDays(startDate, endDate);
+    if (days <= 90) {
+      const result = await this.mcp.callTool('get_journal_range', { startDate, endDate });
+      const parsed = result as McpToolResult;
+      this.cache.set(cacheKey, parsed, 300);
+      return parsed;
+    }
 
-    this.cache.set(cacheKey, parsed, 300);
-    return parsed;
-  }
+    // >90 天自動分割
+    this.logger.info(`日期範圍 ${days} 天，自動分割為多段查詢`);
+    const chunks = splitDateRange(startDate, endDate);
+    const allTexts: string[] = [];
 
-  private extractText(result: McpToolResult): string {
-    if (!result.content) return '';
-    return result.content
-      .filter(c => c.type === 'text')
-      .map(c => c.text)
-      .join('\n');
+    for (const chunk of chunks) {
+      const result = await this.mcp.callTool('get_journal_range', {
+        startDate: chunk.startDate,
+        endDate: chunk.endDate,
+      });
+      const parsed = result as McpToolResult;
+      const text = extractText(parsed);
+      if (text) allTexts.push(text);
+    }
+
+    const merged: McpToolResult = {
+      content: [{ type: 'text', text: allTexts.join('\n') }],
+    };
+    this.cache.set(cacheKey, merged, 300);
+    return merged;
   }
 }

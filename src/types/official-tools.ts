@@ -71,10 +71,57 @@ export interface GetObjectOutput {
 
 export interface GetJournalRangeInput {
   startDate: string; // YYYY-MM-DD
-  endDate: string;   // YYYY-MM-DD, max 92 days from startDate
+  endDate: string;   // YYYY-MM-DD (API 限 92 天，client 層自動分割)
 }
 
 export interface GetJournalRangeOutput {
+  content: Array<{ type: 'text'; text: string }>;
+  isError?: boolean;
+}
+
+// ─── save_to_note_card ───
+
+export interface SaveToNoteCardInput {
+  content: string; // Markdown content, first h1 as title
+}
+
+export interface SaveToNoteCardOutput {
+  content: Array<{ type: 'text'; text: string }>;
+  isError?: boolean;
+}
+
+// ─── append_to_journal ───
+
+export interface AppendToJournalInput {
+  content: string; // Markdown content to append
+}
+
+export interface AppendToJournalOutput {
+  content: Array<{ type: 'text'; text: string }>;
+  isError?: boolean;
+}
+
+// ─── search_pdf_content ───
+
+export interface SearchPdfContentInput {
+  pdfCardId: string;
+  keywords: string[]; // 1-5 keywords, BM25 search
+}
+
+export interface SearchPdfContentOutput {
+  content: Array<{ type: 'text'; text: string }>;
+  isError?: boolean;
+}
+
+// ─── get_pdf_pages ───
+
+export interface GetPdfPagesInput {
+  pdfCardId: string;
+  startPage: number; // >= 1
+  endPage: number;
+}
+
+export interface GetPdfPagesOutput {
   content: Array<{ type: 'text'; text: string }>;
   isError?: boolean;
 }
