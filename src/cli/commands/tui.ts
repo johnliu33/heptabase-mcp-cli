@@ -5,6 +5,7 @@ import { createMcpClient } from '../../transport/mcp-client.js';
 import { HeptabaseClient } from '../../client/index.js';
 import { formatResult } from '../format.js';
 import type { ObjectType } from '../../types/official-tools.js';
+import { whiteboardDeepDive, pdfResearch, knowledgeReview } from '../../workflows/index.js';
 
 // ── ANSI helpers ──────────────────────────────────────────────
 
@@ -66,6 +67,12 @@ function printHelp(): void {
     `${c.yellow('/object')} ${c.dim('<id> <type>')}      讀取物件`,
     `${c.yellow('/pdf-search')} ${c.dim('<id> <kw...>')} 搜尋 PDF 內容`,
     `${c.yellow('/pdf-pages')} ${c.dim('<id> <s> <e>')}  取得 PDF 頁面`,
+    '',
+    c.bold(c.cyan('工作流程')),
+    `${c.yellow('/deep-dive')} ${c.dim('<query|id>')}   白板深入探索`,
+    `${c.yellow('/pdf-research')} ${c.dim('<topic> [id]')} PDF 研究`,
+    `${c.yellow('/review')} ${c.dim('<start> <end> [topic]')} 知識回顧`,
+    '',
     `${c.yellow('/clear')}                     清除畫面`,
     `${c.yellow('/exit')}                      退出`,
   ];
@@ -202,6 +209,47 @@ async function exec(client: HeptabaseClient, line: string): Promise<boolean> {
       return true;
     }
 
+    case 'deep-dive': {
+      const queryOrId = args.join(' ');
+      if (!queryOrId) {
+        console.log(c.red('用法：/deep-dive <query 或 whiteboard_id>'));
+        return true;
+      }
+      await runWorkflow('白板深入探索中…', async () => {
+        // 如果看起來像 ID（含連字號且無空格），用 whiteboard_id；否則用 query
+        const isId = /^[\w-]+$/.test(queryOrId) && queryOrId.includes('-');
+        return whiteboardDeepDive(client, isId ? { whiteboard_id: queryOrId } : { query: queryOrId });
+      });
+      return true;
+    }
+
+    case 'pdf-research': {
+      const topic = args[0];
+      const pdfId = args[1];
+      if (!topic) {
+        console.log(c.red('用法：/pdf-research <topic> [pdf_id]'));
+        return true;
+      }
+      await runWorkflow('PDF 研究中…', () =>
+        pdfResearch(client, { topic, pdf_id: pdfId }),
+      );
+      return true;
+    }
+
+    case 'review': {
+      const startDate = args[0];
+      const endDate = args[1];
+      const topic = args.slice(2).join(' ') || undefined;
+      if (!startDate || !endDate) {
+        console.log(c.red('用法：/review <start_date> <end_date> [topic]'));
+        return true;
+      }
+      await runWorkflow('知識回顧中…', () =>
+        knowledgeReview(client, { start_date: startDate, end_date: endDate, topic }),
+      );
+      return true;
+    }
+
     default:
       console.log(c.red(`未知指令：/${cmd}`));
       console.log(c.dim('輸入 /help 查看可用指令'));
@@ -231,6 +279,30 @@ async function run(
     } else {
       console.log(output);
     }
+  } catch (error) {
+    clearInterval(timer);
+    process.stdout.write('\r' + ' '.repeat(label.length + 4) + '\r');
+    console.log(c.red(`錯誤：${error instanceof Error ? error.message : error}`));
+  }
+}
+
+// ── Run workflow with spinner ─────────────────────────────
+
+async function runWorkflow(
+  label: string,
+  fn: () => Promise<unknown>,
+): Promise<void> {
+  const frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+  let i = 0;
+  const timer = setInterval(() => {
+    process.stdout.write(`\r${c.cyan(frames[i++ % frames.length])} ${label}`);
+  }, 80);
+
+  try {
+    const result = await fn();
+    clearInterval(timer);
+    process.stdout.write('\r' + ' '.repeat(label.length + 4) + '\r');
+    console.log(JSON.stringify(result, null, 2));
   } catch (error) {
     clearInterval(timer);
     process.stdout.write('\r' + ' '.repeat(label.length + 4) + '\r');
