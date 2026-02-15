@@ -1,0 +1,18 @@
+{
+  "objects": [
+    {
+      "id": "card-1",
+      "type": "card",
+      "title": "MCP 入門",
+      "snippet": "...MCP 是 Model Context Protocol...",
+      "score": 0.95
+    },
+    {
+      "id": "card-2",
+      "type": "card",
+      "title": "MCP 實作筆記",
+      "snippet": "...實作步驟包括...",
+      "score": 0.87
+    }
+  ]
+}

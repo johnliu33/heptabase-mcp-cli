@@ -1,0 +1,22 @@
+{
+  "whiteboard": {
+    "id": "wb-1",
+    "name": "專案白板",
+    "objects": [
+      {
+        "id": "card-1",
+        "type": "card",
+        "title": "需求分析",
+        "partial_content": "這張卡片討論了系統的需求...",
+        "position": { "x": 100, "y": 200 }
+      },
+      {
+        "id": "card-2",
+        "type": "card",
+        "title": "技術架構",
+        "partial_content": "架構設計採用三層式...",
+        "position": { "x": 300, "y": 200 }
+      }
+    ]
+  }
+}
