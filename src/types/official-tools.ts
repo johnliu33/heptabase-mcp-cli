@@ -67,6 +67,18 @@ export interface GetObjectOutput {
   isError?: boolean;
 }
 
+// ─── get_journal_range ───
+
+export interface GetJournalRangeInput {
+  startDate: string; // YYYY-MM-DD
+  endDate: string;   // YYYY-MM-DD, max 92 days from startDate
+}
+
+export interface GetJournalRangeOutput {
+  content: Array<{ type: 'text'; text: string }>;
+  isError?: boolean;
+}
+
 // ─── MCP Tool 通用回傳格式 ───
 // 所有 MCP tool 回傳的都是 { content: [{type:'text', text:'...'}] }
 // 實際資料結構在 text 欄位裡面（通常是 JSON 或純文字）

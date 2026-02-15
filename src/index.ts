@@ -4,6 +4,7 @@ import { createSearchCommand } from './cli/commands/search.js';
 import { createWhiteboardCommand } from './cli/commands/whiteboard.js';
 import { createObjectCommand } from './cli/commands/object.js';
 import { createInteractiveCommand } from './cli/commands/interactive.js';
+import { createJournalCommand } from './cli/commands/journal.js';
 import { logger } from './utils/logger.js';
 
 const program = new Command();
@@ -23,6 +24,7 @@ program.addCommand(createAuthCommand());
 program.addCommand(createSearchCommand());
 program.addCommand(createWhiteboardCommand());
 program.addCommand(createObjectCommand());
+program.addCommand(createJournalCommand());
 program.addCommand(createInteractiveCommand());
 
 program.parse();

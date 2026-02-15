@@ -4,7 +4,16 @@ import { TokenManager } from '../../transport/token-manager.js';
 import { createMcpClient } from '../../transport/mcp-client.js';
 import { HeptabaseClient } from '../../client/index.js';
 import { formatResult } from '../format.js';
-import type { ObjectType } from '../../types/official-tools.js';
+import type { ObjectType, SearchableObjectType } from '../../types/official-tools.js';
+
+const SEARCHABLE_TYPES: { value: SearchableObjectType | 'all'; name: string }[] = [
+  { value: 'all', name: '全部' },
+  { value: 'card', name: 'card（卡片）' },
+  { value: 'journal', name: 'journal（日誌）' },
+  { value: 'pdfCard', name: 'pdfCard（PDF）' },
+  { value: 'mediaCard', name: 'mediaCard（媒體）' },
+  { value: 'highlightElement', name: 'highlightElement（摘要）' },
+];
 
 export function createInteractiveCommand(): Command {
   return new Command('interactive')
@@ -29,6 +38,7 @@ export function createInteractiveCommand(): Command {
           message: '請選擇操作：',
           choices: [
             { value: 'search', name: '搜尋筆記' },
+            { value: 'journal', name: '讀取日誌（依日期）' },
             { value: 'whiteboard-search', name: '搜尋白板' },
             { value: 'whiteboard-get', name: '讀取白板（需要 ID）' },
             { value: 'object-get', name: '讀取物件（需要 ID）' },
@@ -40,11 +50,36 @@ export function createInteractiveCommand(): Command {
           case 'search': {
             const query = await input({ message: '搜尋關鍵字：' });
             if (!query) break;
+            const searchType = await select({
+              message: '篩選物件類型：',
+              choices: SEARCHABLE_TYPES,
+            });
+            const resultObjectTypes = searchType === 'all'
+              ? []
+              : [searchType] as SearchableObjectType[];
             try {
-              const result = await client.semanticSearch([query]);
+              const result = await client.semanticSearch([query], resultObjectTypes);
               console.log(formatResult(result, false));
             } catch (error) {
               console.error('搜尋失敗：', error instanceof Error ? error.message : error);
+            }
+            break;
+          }
+
+          case 'journal': {
+            const startDate = await input({
+              message: '起始日期 (YYYY-MM-DD)：',
+              default: new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10),
+            });
+            const endDate = await input({
+              message: '結束日期 (YYYY-MM-DD)：',
+              default: new Date().toISOString().slice(0, 10),
+            });
+            try {
+              const result = await client.getJournalRange(startDate, endDate);
+              console.log(formatResult(result, false));
+            } catch (error) {
+              console.error('讀取日誌失敗：', error instanceof Error ? error.message : error);
             }
             break;
           }

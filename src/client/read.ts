@@ -54,6 +54,21 @@ export class ReadClient {
     return parsed;
   }
 
+  async getJournalRange(startDate: string, endDate: string): Promise<McpToolResult> {
+    const cacheKey = this.cache.buildKey('get_journal_range', { startDate, endDate });
+    const cached = this.cache.get<McpToolResult>(cacheKey);
+    if (cached) {
+      this.logger.debug(`Cache hit: ${cacheKey}`);
+      return cached;
+    }
+
+    const result = await this.mcp.callTool('get_journal_range', { startDate, endDate });
+    const parsed = result as McpToolResult;
+
+    this.cache.set(cacheKey, parsed, 300);
+    return parsed;
+  }
+
   private extractText(result: McpToolResult): string {
     if (!result.content) return '';
     return result.content

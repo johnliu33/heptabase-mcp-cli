@@ -36,4 +36,8 @@ export class HeptabaseClient {
   async getObject(objectId: string, objectType: ObjectType): Promise<McpToolResult> {
     return this.readClient.getObject(objectId, objectType);
   }
+
+  async getJournalRange(startDate: string, endDate: string): Promise<McpToolResult> {
+    return this.readClient.getJournalRange(startDate, endDate);
+  }
 }
