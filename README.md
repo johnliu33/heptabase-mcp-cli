@@ -1,16 +1,21 @@
 # Heptabase MCP CLI
 
-CLI tool for searching and reading your [Heptabase](https://heptabase.com) knowledge base via the official [MCP](https://modelcontextprotocol.io/) API.
+CLI tool for searching, reading, and writing your [Heptabase](https://heptabase.com) knowledge base via the official [MCP](https://modelcontextprotocol.io/) API.
 
 ## Features
 
 - **OAuth authentication** — Browser-based login, token auto-refresh
+- **9 MCP tools** — Full coverage of Heptabase official MCP API
 - **Semantic search** — Hybrid full-text + semantic search across notes, journals, PDFs
 - **Whiteboard exploration** — Search and inspect whiteboard structures
 - **Object deep read** — Retrieve full content of any card, journal, or media
+- **Journal & write** — Read/append journals, create note cards
+- **PDF tools** — BM25 search within PDFs, page-range extraction
+- **5 workflows** — Multi-step automated pipelines (whiteboard deep-dive, PDF research, knowledge review, topic analysis, orphan detection)
+- **TUI mode** — REPL-style terminal with slash commands
 - **Interactive mode** — Menu-driven exploration with drill-down
 - **In-memory cache** — Avoids redundant API calls (60s for search, 300s for reads)
-- **Workflows** — Multi-step automated workflows (whiteboard deep-dive, PDF research, knowledge review, topic analysis, orphan detection)
+- **Retry with jitter** — Exponential backoff + random jitter for stability
 
 ## Prerequisites
 
@@ -38,8 +43,8 @@ heptabase auth login
 # 2. Search your notes
 heptabase search "machine learning"
 
-# 3. Launch interactive mode
-heptabase interactive
+# 3. Launch TUI mode (recommended)
+heptabase tui
 ```
 
 ## Commands
@@ -89,15 +94,35 @@ heptabase object get <id> --type journal
 heptabase object get <id> --type pdfCard
 ```
 
-### `interactive` — Interactive Mode
+### `journal` — Journal Operations
 
 ```bash
-heptabase interactive
-# or
-heptabase i
+# Read today's journal
+heptabase journal today
+
+# Read journals by date range (auto-splits if > 90 days)
+heptabase journal get --from 2025-01-01 --to 2025-01-31
+
+# Append content to today's journal
+heptabase journal append "Today I learned about MCP"
 ```
 
-Menu-driven mode: search notes, browse whiteboards, drill into objects.
+### `save` — Create Note Card
+
+```bash
+# Create a new card (first h1 becomes the title)
+heptabase save "# My Title\n\nSome content here"
+```
+
+### `pdf` — PDF Operations
+
+```bash
+# Search within a PDF (BM25)
+heptabase pdf search <pdfCardId> "keyword1" "keyword2"
+
+# Get specific pages
+heptabase pdf pages <pdfCardId> 1 5
+```
 
 ### `workflow` — Multi-step Workflows
 
@@ -120,6 +145,51 @@ heptabase workflow topic-analysis "deep learning" --max-notes 5
 heptabase workflow orphan-detection --query "project"
 ```
 
+#### Workflow Descriptions
+
+| Workflow | Description |
+|----------|-------------|
+| `whiteboard-deep-dive` | Search a whiteboard, then fetch full content of every object on it. PDF objects use `search_pdf_content` instead of `get_object`. |
+| `pdf-research` | Find a PDF by topic via semantic search, locate relevant chunks with BM25, then extract full page content for matched pages. |
+| `knowledge-review` | Retrieve journals for a date range, optionally search related notes by topic. Auto-splits ranges > 90 days. |
+| `topic-analysis` | Semantic search for a topic, then fetch full content of each matched note in parallel (up to `max_notes`). |
+| `orphan-detection` | Compare objects found via semantic search against objects placed on whiteboards, surfacing notes that aren't on any whiteboard. |
+
+### `tui` — TUI Mode
+
+```bash
+heptabase tui
+# or
+heptabase t
+```
+
+REPL-style terminal with slash commands. Supports all search/read/write operations and all 5 workflows:
+
+```
+/search <query>              Semantic search
+/journal [from] [to]         Read journals
+/append <content>            Append to today's journal
+/save <content>              Create note card
+/whiteboard <keywords>       Search whiteboards
+/object <id> <type>          Read object
+/deep-dive <query|id>        Whiteboard deep dive workflow
+/pdf-research <topic> [id]   PDF research workflow
+/review <start> <end> [topic] Knowledge review workflow
+/topic <topic> [max]         Topic analysis workflow
+/orphans [query]             Orphan detection workflow
+/help                        Show all commands
+```
+
+### `interactive` — Interactive Mode
+
+```bash
+heptabase interactive
+# or
+heptabase i
+```
+
+Menu-driven mode: search notes, browse whiteboards, drill into objects.
+
 ### Global Options
 
 ```bash
@@ -130,14 +200,27 @@ heptabase --version       # Show version
 ## Architecture
 
 ```
-CLI (commander)
- └─ HeptabaseClient (Layer 2 — cache + logging)
-     └─ McpClient (Layer 1 — StreamableHTTP + OAuth)
-         └─ Heptabase Official MCP Server
-            https://api.heptabase.com/mcp
+CLI / TUI (commander + readline)
+ └─ Workflows (multi-step orchestration)
+     └─ HeptabaseClient (Layer 2 — cache + logging)
+         └─ McpClient (Layer 1 — StreamableHTTP + OAuth + retry)
+             └─ Heptabase Official MCP Server
+                https://api.heptabase.com/mcp
 ```
 
-This project is a **client layer** wrapping the official Heptabase MCP — it does not implement its own MCP server. All data access goes through the 9 official MCP tools.
+This project is a **client layer** wrapping the official Heptabase MCP — it does not implement its own MCP server. All data access goes through the 9 official MCP tools:
+
+| Tool | Description |
+|------|-------------|
+| `semantic_search_objects` | Hybrid full-text + semantic search |
+| `search_whiteboards` | Keyword search for whiteboards |
+| `get_whiteboard_with_objects` | Read whiteboard structure and objects |
+| `get_object` | Read full content of any object |
+| `get_journal_range` | Read journals by date range |
+| `save_to_note_card` | Create a new note card |
+| `append_to_journal` | Append content to today's journal |
+| `search_pdf_content` | BM25 search within a PDF |
+| `get_pdf_pages` | Read specific pages of a PDF |
 
 ## Development
 
@@ -155,8 +238,8 @@ pnpm lint          # Type check (tsc --noEmit)
 src/
 ├── index.ts                 # CLI entry point
 ├── transport/               # Layer 1: MCP connection + OAuth
-├── client/                  # Layer 2: typed tool wrappers
-├── cli/commands/            # CLI subcommands
+├── client/                  # Layer 2: typed tool wrappers (search, read, write, pdf)
+├── cli/commands/            # CLI subcommands + TUI
 ├── cache/                   # In-memory TTL cache
 ├── types/                   # TypeScript type definitions
 ├── workflows/               # Multi-step workflow orchestrations
@@ -166,8 +249,15 @@ tests/
 ├── contract/                # Contract tests (CT-01 ~ CT-12)
 ├── workflow/                # Workflow tests (WT-01 ~ WT-06)
 ├── e2e/                     # E2E integration tests (E2E-01 ~ E2E-02)
-└── unit/                    # Unit tests (cache, retry)
+└── unit/                    # Unit tests (cache, retry, date-range)
 ```
+
+### Test Coverage
+
+- **Contract tests** (CT-01 ~ CT-12): Verify each MCP tool wrapper behaves correctly against mock responses
+- **Workflow tests** (WT-01 ~ WT-06): Verify multi-step workflow orchestration and fault tolerance
+- **E2E tests** (E2E-01 ~ E2E-02): End-to-end integration tests with mock MCP client
+- **Unit tests**: Cache TTL, retry with jitter, date-range splitting
 
 ## Token Storage
 
@@ -175,10 +265,10 @@ OAuth tokens are stored at `~/.heptabase-extension/token.json` with `0600` permi
 
 ## Roadmap
 
-- **Phase 1**: Search + read (4 tools) + OAuth + cache + CLI
-- **Phase 2**: Journal, write operations, PDF tools
-- **Phase 3**: High-level workflows (whiteboard deep-dive, PDF research, knowledge review)
-- **Phase 4 (current)**: E2E tests, performance optimization, topic analysis, orphan detection
+- [x] **Phase 1**: Search + read (4 tools) + OAuth + cache + CLI
+- [x] **Phase 2**: Journal, write operations, PDF tools (9 tools total)
+- [x] **Phase 3**: Workflows (whiteboard deep-dive, PDF research, knowledge review) + TUI
+- [x] **Phase 4**: Topic analysis, orphan detection, performance optimization, E2E tests
 
 ## License
 
