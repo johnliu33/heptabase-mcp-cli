@@ -3,7 +3,7 @@ import { MemoryCache } from '../cache/memory-cache.js';
 import { Logger } from '../utils/logger.js';
 import { SearchClient } from './search.js';
 import { ReadClient } from './read.js';
-import type { SemanticSearchOutput, SearchWhiteboardsOutput, GetWhiteboardOutput, GetObjectOutput } from '../types/official-tools.js';
+import type { McpToolResult, ObjectType, SearchableObjectType } from '../types/official-tools.js';
 
 export class HeptabaseClient {
   private searchClient: SearchClient;
@@ -18,19 +18,22 @@ export class HeptabaseClient {
     this.readClient = new ReadClient(mcp, this.cache, this.logger);
   }
 
-  async semanticSearch(query: string): Promise<SemanticSearchOutput> {
-    return this.searchClient.semanticSearch(query);
+  async semanticSearch(
+    queries: string[],
+    resultObjectTypes: SearchableObjectType[] = [],
+  ): Promise<McpToolResult> {
+    return this.searchClient.semanticSearch(queries, resultObjectTypes);
   }
 
-  async searchWhiteboards(query: string): Promise<SearchWhiteboardsOutput> {
-    return this.searchClient.searchWhiteboards(query);
+  async searchWhiteboards(keywords: string[]): Promise<McpToolResult> {
+    return this.searchClient.searchWhiteboards(keywords);
   }
 
-  async getWhiteboard(whiteboardId: string): Promise<GetWhiteboardOutput> {
+  async getWhiteboard(whiteboardId: string): Promise<McpToolResult> {
     return this.readClient.getWhiteboard(whiteboardId);
   }
 
-  async getObject(objectId: string): Promise<GetObjectOutput> {
-    return this.readClient.getObject(objectId);
+  async getObject(objectId: string, objectType: ObjectType): Promise<McpToolResult> {
+    return this.readClient.getObject(objectId, objectType);
   }
 }

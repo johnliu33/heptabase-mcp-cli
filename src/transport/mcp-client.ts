@@ -1,13 +1,14 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
+import { UnauthorizedError } from '@modelcontextprotocol/sdk/client/auth.js';
 import { TokenManager } from './token-manager.js';
-import { HeptabaseOAuthProvider } from './oauth.js';
+import { HeptabaseOAuthProvider, waitForAuthCallback } from './oauth.js';
 import { HeptabaseError } from '../types/common.js';
 import { withRetry } from '../utils/retry.js';
 import { logger } from '../utils/logger.js';
 
 const HEPTABASE_MCP_URL = 'https://api.heptabase.com/mcp';
+const CALLBACK_PORT = 8371;
 
 export interface McpClientOptions {
   tokenManager: TokenManager;
@@ -24,7 +25,7 @@ export class McpClient {
   constructor(options: McpClientOptions) {
     this.tokenManager = options.tokenManager;
     this.serverUrl = options.serverUrl ?? HEPTABASE_MCP_URL;
-    this.authProvider = new HeptabaseOAuthProvider(this.tokenManager);
+    this.authProvider = new HeptabaseOAuthProvider(this.tokenManager, CALLBACK_PORT);
     this.client = new Client({
       name: 'heptabase-extension',
       version: '1.0.0',
@@ -35,35 +36,33 @@ export class McpClient {
     if (this.connected) return;
 
     const url = new URL(this.serverUrl);
+    const transport = new StreamableHTTPClientTransport(url, {
+      authProvider: this.authProvider,
+    });
 
     try {
-      // Try StreamableHTTP first
-      const transport = new StreamableHTTPClientTransport(url, {
-        authProvider: this.authProvider,
-      });
       await this.client.connect(transport);
       this.connected = true;
-      logger.info('MCP 連線成功 (StreamableHTTP)');
-    } catch (streamableError) {
-      logger.debug('StreamableHTTP 失敗，嘗試 SSE fallback...', streamableError);
-      try {
-        // Fallback to SSE
+      logger.info('MCP 連線成功');
+    } catch (error) {
+      if (error instanceof UnauthorizedError) {
+        logger.info('需要 OAuth 授權，等待瀏覽器授權...');
+        const code = await waitForAuthCallback(CALLBACK_PORT);
+        await transport.finishAuth(code);
+
+        // 重新建立 client 和 transport 連線
         this.client = new Client({
           name: 'heptabase-extension',
           version: '1.0.0',
         });
-        const sseTransport = new SSEClientTransport(url, {
-          authProvider: this.authProvider,
-        });
-        await this.client.connect(sseTransport);
-        this.connected = true;
-        logger.info('MCP 連線成功 (SSE)');
-      } catch (sseError) {
         this.connected = false;
-        throw HeptabaseError.networkError(
-          `無法連接 Heptabase MCP Server: ${sseError instanceof Error ? sseError.message : String(sseError)}`
-        );
+        return this.connect();
       }
+
+      this.connected = false;
+      throw HeptabaseError.networkError(
+        `無法連接 Heptabase MCP Server: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 

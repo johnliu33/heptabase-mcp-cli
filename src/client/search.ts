@@ -1,7 +1,7 @@
 import type { McpClient } from '../transport/mcp-client.js';
 import type { MemoryCache } from '../cache/memory-cache.js';
 import type { Logger } from '../utils/logger.js';
-import type { SemanticSearchOutput, SearchWhiteboardsOutput } from '../types/official-tools.js';
+import type { McpToolResult, SearchableObjectType } from '../types/official-tools.js';
 
 export class SearchClient {
   constructor(
@@ -10,31 +10,37 @@ export class SearchClient {
     private logger: Logger,
   ) {}
 
-  async semanticSearch(query: string): Promise<SemanticSearchOutput> {
-    const cacheKey = this.cache.buildKey('semantic_search', { query });
-    const cached = this.cache.get<SemanticSearchOutput>(cacheKey);
+  async semanticSearch(
+    queries: string[],
+    resultObjectTypes: SearchableObjectType[] = [],
+  ): Promise<McpToolResult> {
+    const cacheKey = this.cache.buildKey('semantic_search', { queries, resultObjectTypes });
+    const cached = this.cache.get<McpToolResult>(cacheKey);
     if (cached) {
       this.logger.debug(`Cache hit: ${cacheKey}`);
       return cached;
     }
 
-    const result = await this.mcp.callTool('semantic_search_objects', { query });
-    const parsed = result as SemanticSearchOutput;
+    const result = await this.mcp.callTool('semantic_search_objects', {
+      queries,
+      resultObjectTypes,
+    });
+    const parsed = result as McpToolResult;
 
     this.cache.set(cacheKey, parsed, 60); // 60 秒 TTL
     return parsed;
   }
 
-  async searchWhiteboards(query: string): Promise<SearchWhiteboardsOutput> {
-    const cacheKey = this.cache.buildKey('search_whiteboards', { query });
-    const cached = this.cache.get<SearchWhiteboardsOutput>(cacheKey);
+  async searchWhiteboards(keywords: string[]): Promise<McpToolResult> {
+    const cacheKey = this.cache.buildKey('search_whiteboards', { keywords });
+    const cached = this.cache.get<McpToolResult>(cacheKey);
     if (cached) {
       this.logger.debug(`Cache hit: ${cacheKey}`);
       return cached;
     }
 
-    const result = await this.mcp.callTool('search_whiteboards', { query });
-    const parsed = result as SearchWhiteboardsOutput;
+    const result = await this.mcp.callTool('search_whiteboards', { keywords });
+    const parsed = result as McpToolResult;
 
     this.cache.set(cacheKey, parsed, 300);
     return parsed;

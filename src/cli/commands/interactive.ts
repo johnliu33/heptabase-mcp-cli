@@ -3,7 +3,8 @@ import { select, input } from '@inquirer/prompts';
 import { TokenManager } from '../../transport/token-manager.js';
 import { createMcpClient } from '../../transport/mcp-client.js';
 import { HeptabaseClient } from '../../client/index.js';
-import { formatSearchResults, formatWhiteboardList, formatWhiteboard, formatObject } from '../format.js';
+import { formatResult } from '../format.js';
+import type { ObjectType } from '../../types/official-tools.js';
 
 export function createInteractiveCommand(): Command {
   return new Command('interactive')
@@ -40,26 +41,8 @@ export function createInteractiveCommand(): Command {
             const query = await input({ message: '搜尋關鍵字：' });
             if (!query) break;
             try {
-              const result = await client.semanticSearch(query);
-              console.log(formatSearchResults(result, false));
-
-              if (result.objects.length > 0) {
-                const readMore = await select({
-                  message: '要深度讀取哪個物件？',
-                  choices: [
-                    ...result.objects.map((obj, i) => ({
-                      value: obj.id,
-                      name: `${i + 1}. [${obj.type}] ${obj.title}`,
-                    })),
-                    { value: 'skip', name: '返回主選單' },
-                  ],
-                });
-
-                if (readMore !== 'skip') {
-                  const objResult = await client.getObject(readMore);
-                  console.log(formatObject(objResult, false));
-                }
-              }
+              const result = await client.semanticSearch([query]);
+              console.log(formatResult(result, false));
             } catch (error) {
               console.error('搜尋失敗：', error instanceof Error ? error.message : error);
             }
@@ -70,26 +53,8 @@ export function createInteractiveCommand(): Command {
             const query = await input({ message: '白板搜尋關鍵字：' });
             if (!query) break;
             try {
-              const result = await client.searchWhiteboards(query);
-              console.log(formatWhiteboardList(result, false));
-
-              if (result.whiteboards.length > 0) {
-                const viewBoard = await select({
-                  message: '要查看哪個白板？',
-                  choices: [
-                    ...result.whiteboards.map((wb, i) => ({
-                      value: wb.id,
-                      name: `${i + 1}. ${wb.name} (${wb.object_count} objects)`,
-                    })),
-                    { value: 'skip', name: '返回主選單' },
-                  ],
-                });
-
-                if (viewBoard !== 'skip') {
-                  const wbResult = await client.getWhiteboard(viewBoard);
-                  console.log(formatWhiteboard(wbResult, false));
-                }
-              }
+              const result = await client.searchWhiteboards([query]);
+              console.log(formatResult(result, false));
             } catch (error) {
               console.error('搜尋失敗：', error instanceof Error ? error.message : error);
             }
@@ -101,7 +66,7 @@ export function createInteractiveCommand(): Command {
             if (!id) break;
             try {
               const result = await client.getWhiteboard(id);
-              console.log(formatWhiteboard(result, false));
+              console.log(formatResult(result, false));
             } catch (error) {
               console.error('讀取失敗：', error instanceof Error ? error.message : error);
             }
@@ -111,9 +76,19 @@ export function createInteractiveCommand(): Command {
           case 'object-get': {
             const id = await input({ message: '物件 ID：' });
             if (!id) break;
+            const objType = await select({
+              message: '物件類型：',
+              choices: [
+                { value: 'card', name: 'card（卡片）' },
+                { value: 'journal', name: 'journal（日誌）' },
+                { value: 'pdfCard', name: 'pdfCard（PDF）' },
+                { value: 'highlightElement', name: 'highlightElement（摘要）' },
+                { value: 'section', name: 'section（區段）' },
+              ],
+            });
             try {
-              const result = await client.getObject(id);
-              console.log(formatObject(result, false));
+              const result = await client.getObject(id, objType as ObjectType);
+              console.log(formatResult(result, false));
             } catch (error) {
               console.error('讀取失敗：', error instanceof Error ? error.message : error);
             }

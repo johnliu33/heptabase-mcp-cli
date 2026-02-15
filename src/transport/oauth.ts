@@ -2,7 +2,7 @@ import { createServer, type Server } from 'node:http';
 import { URL, URLSearchParams } from 'node:url';
 import open from 'open';
 import type { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js';
-import type { OAuthClientMetadata, OAuthTokens } from '@modelcontextprotocol/sdk/shared/auth.js';
+import type { OAuthClientMetadata, OAuthTokens, OAuthClientInformationMixed } from '@modelcontextprotocol/sdk/shared/auth.js';
 import { TokenManager, type TokenData } from './token-manager.js';
 import { logger } from '../utils/logger.js';
 
@@ -12,6 +12,7 @@ export class HeptabaseOAuthProvider implements OAuthClientProvider {
   private tokenManager: TokenManager;
   private _codeVerifier: string = '';
   private _redirectUrl: URL;
+  private _clientInfo: OAuthClientInformationMixed | undefined;
 
   constructor(tokenManager: TokenManager, redirectPort: number = 8371) {
     this.tokenManager = tokenManager;
@@ -32,12 +33,13 @@ export class HeptabaseOAuthProvider implements OAuthClientProvider {
     };
   }
 
-  async clientInformation() {
-    return undefined;
+  async clientInformation(): Promise<OAuthClientInformationMixed | undefined> {
+    return this._clientInfo;
   }
 
-  async saveClientInformation() {
-    // Dynamic registration info - not needed for Heptabase
+  async saveClientInformation(info: OAuthClientInformationMixed): Promise<void> {
+    this._clientInfo = info;
+    logger.debug('Client information 已儲存');
   }
 
   async tokens(): Promise<OAuthTokens | undefined> {
