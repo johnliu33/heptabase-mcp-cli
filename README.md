@@ -1,5 +1,7 @@
 # Heptabase MCP CLI
 
+> **[正體中文版 README](docs/README.zh-TW.md)**
+
 CLI tool for searching, reading, and writing your [Heptabase](https://heptabase.com) knowledge base via the official [MCP](https://modelcontextprotocol.io/) API.
 
 ## Features
