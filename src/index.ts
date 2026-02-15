@@ -7,6 +7,7 @@ import { createInteractiveCommand } from './cli/commands/interactive.js';
 import { createJournalCommand } from './cli/commands/journal.js';
 import { createSaveCommand } from './cli/commands/save.js';
 import { createPdfCommand } from './cli/commands/pdf.js';
+import { createTuiCommand } from './cli/commands/tui.js';
 import { logger } from './utils/logger.js';
 
 const program = new Command();
@@ -30,5 +31,6 @@ program.addCommand(createJournalCommand());
 program.addCommand(createSaveCommand());
 program.addCommand(createPdfCommand());
 program.addCommand(createInteractiveCommand());
+program.addCommand(createTuiCommand());
 
 program.parse();
