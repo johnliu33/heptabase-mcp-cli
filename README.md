@@ -28,6 +28,8 @@ pnpm build
 
 ## Quick Start
 
+> **[正體中文快速上手指南](docs/quick-start.md)**
+
 ```bash
 # 1. Login via OAuth (opens browser)
 heptabase auth login
